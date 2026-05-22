@@ -13,7 +13,6 @@ const SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:717094201142:mini-jira-task-assigne
 // Get all tasks
 router.get('/', verifyToken, async (req, res) => {
   try {
-    console.log('GET /tasks user:', req.user)
     const { role, teamId } = req.user
     let result
 
@@ -30,7 +29,6 @@ router.get('/', verifyToken, async (req, res) => {
 
     res.json(result.Items)
   } catch (err) {
-    console.error('GET /tasks error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
@@ -51,16 +49,13 @@ router.get('/:taskId', verifyToken, async (req, res) => {
 
     res.json(result.Item)
   } catch (err) {
-    console.error('GET /tasks/:id error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
 
-// Create task
+// Create task (manager only)
 router.post('/', verifyToken, async (req, res) => {
   try {
-    console.log('POST /tasks user:', req.user)
-    console.log('POST /tasks body:', req.body)
     if (req.user.role !== 'manager') return res.status(403).json({ error: 'Only managers can create tasks' })
 
     const task = {
@@ -73,26 +68,23 @@ router.post('/', verifyToken, async (req, res) => {
 
     await dynamo.put({ TableName: TABLE, Item: task }).promise()
 
-    // Publish SNS notification
     try {
       await sns.publish({
         TopicArn: SNS_TOPIC_ARN,
         Message: `Task "${task.title}" has been assigned to ${task.assignee}`,
         Subject: 'New Task Assigned - Mini Jira'
       }).promise()
-      console.log('SNS notification sent')
     } catch (snsErr) {
       console.error('SNS error:', snsErr.message)
     }
 
     res.status(201).json(task)
   } catch (err) {
-    console.error('POST /tasks error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
 
-// Update task
+// Update task (employees can only update status)
 router.put('/:taskId', verifyToken, async (req, res) => {
   try {
     const { role, teamId, userId } = req.user
@@ -106,16 +98,19 @@ router.put('/:taskId', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' })
     }
 
+    // Employees can only update status, managers can update everything
+    const allowedUpdate = role === 'manager' ? req.body : { status: req.body.status }
+
     const auditEntry = {
       changedBy: userId,
       changedAt: new Date().toISOString(),
       oldStatus: existing.Item.status,
-      newStatus: req.body.status || existing.Item.status
+      newStatus: allowedUpdate.status || existing.Item.status
     }
 
     const updated = {
       ...existing.Item,
-      ...req.body,
+      ...allowedUpdate,
       taskId: req.params.taskId,
       auditLog: [...(existing.Item.auditLog || []), auditEntry]
     }
@@ -123,12 +118,11 @@ router.put('/:taskId', verifyToken, async (req, res) => {
     await dynamo.put({ TableName: TABLE, Item: updated }).promise()
     res.json(updated)
   } catch (err) {
-    console.error('PUT /tasks error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
 
-// Delete task
+// Delete task (manager only)
 router.delete('/:taskId', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'manager') return res.status(403).json({ error: 'Only managers can delete tasks' })
@@ -140,7 +134,6 @@ router.delete('/:taskId', verifyToken, async (req, res) => {
 
     res.json({ message: 'Task deleted' })
   } catch (err) {
-    console.error('DELETE /tasks error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
