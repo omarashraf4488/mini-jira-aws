@@ -1,2 +1,4 @@
+"node_modules/" 
 ".env" 
-"node_modules" 
+"mini-jira-frontend/.env" 
+"mini-jira-frontend/node_modules/" 
