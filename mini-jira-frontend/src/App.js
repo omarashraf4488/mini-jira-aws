@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { CognitoUserPool, CognitoUser, AuthenticationDetails } from 'amazon-cognito-identity-js'
+import { CognitoUserPool, CognitoUser, AuthenticationDetails, CognitoUserAttribute } from 'amazon-cognito-identity-js'
 import { cognitoConfig, API_URL } from './aws-config'
 import './App.css'
  
@@ -39,6 +39,7 @@ function App() {
   }
  
   if (page === 'login') return <Login userPool={userPool} setUser={setUser} setToken={setToken} setPage={setPage} showToast={showToast} />
+  if (page === 'signup') return <Signup userPool={userPool} setPage={setPage} showToast={showToast} />
   
   return (
     <div>
@@ -118,9 +119,103 @@ function Login({ userPool, setUser, setToken, setPage, showToast }) {
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter password" onKeyPress={e => e.key === 'Enter' && login()} />
         </div>
         {error && <p className="error">{error}</p>}
-        <button className="btn btn-primary" style={{width:'100%'}} onClick={login} disabled={loading}>
+        <button className="btn btn-primary" style={{width:'100%', marginBottom:'1rem'}} onClick={login} disabled={loading}>
           {loading ? 'Logging in...' : 'Login'}
         </button>
+        <p style={{textAlign:'center', fontSize:'14px', color:'#666'}}>
+          Don't have an account? <span style={{color:'#1e3a5f', cursor:'pointer', fontWeight:'bold'}} onClick={() => setPage('signup')}>Sign Up</span>
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function Signup({ userPool, setPage, showToast }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState('employee')
+  const [teamId, setTeamId] = useState('')
+  const [code, setCode] = useState('')
+  const [step, setStep] = useState('signup')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const signup = () => {
+    if (!email || !password || !teamId) return setError('Please fill all fields')
+    setLoading(true)
+    setError('')
+    const attributes = [
+      new CognitoUserAttribute({ Name: 'email', Value: email }),
+      new CognitoUserAttribute({ Name: 'custom:role', Value: role }),
+      new CognitoUserAttribute({ Name: 'custom:teamId', Value: teamId }),
+    ]
+    userPool.signUp(email, password, attributes, null, (err, result) => {
+      setLoading(false)
+      if (err) return setError(err.message)
+      setStep('confirm')
+      showToast('Account created! Check your email for verification code.')
+    })
+  }
+
+  const confirm = () => {
+    setLoading(true)
+    setError('')
+    const cognitoUser = new CognitoUser({ Username: email, Pool: userPool })
+    cognitoUser.confirmRegistration(code, true, (err) => {
+      setLoading(false)
+      if (err) return setError(err.message)
+      showToast('Account verified! Please login.')
+      setPage('login')
+    })
+  }
+
+  if (step === 'confirm') return (
+    <div style={{display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh'}}>
+      <div className="card" style={{width:'400px'}}>
+        <h2 style={{marginBottom:'1.5rem', textAlign:'center'}}>Verify Email</h2>
+        <p style={{marginBottom:'1rem', color:'#666', fontSize:'14px'}}>Enter the verification code sent to {email}</p>
+        <div className="form-group">
+          <label>Verification Code</label>
+          <input type="text" value={code} onChange={e => setCode(e.target.value)} placeholder="Enter code" />
+        </div>
+        {error && <p className="error">{error}</p>}
+        <button className="btn btn-primary" style={{width:'100%', marginBottom:'1rem'}} onClick={confirm} disabled={loading}>
+          {loading ? 'Verifying...' : 'Verify'}
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div style={{display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh'}}>
+      <div className="card" style={{width:'400px'}}>
+        <h2 style={{marginBottom:'1.5rem', textAlign:'center'}}>🚀 Create Account</h2>
+        <div className="form-group">
+          <label>Email *</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Enter email" />
+        </div>
+        <div className="form-group">
+          <label>Password *</label>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 chars, uppercase, number, symbol" />
+        </div>
+        <div className="form-group">
+          <label>Role *</label>
+          <select value={role} onChange={e => setRole(e.target.value)}>
+            <option value="employee">Employee</option>
+            <option value="manager">Manager</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Team *</label>
+          <input type="text" value={teamId} onChange={e => setTeamId(e.target.value)} placeholder="e.g. Frontend, Backend, QA" />
+        </div>
+        {error && <p className="error">{error}</p>}
+        <button className="btn btn-primary" style={{width:'100%', marginBottom:'1rem'}} onClick={signup} disabled={loading}>
+          {loading ? 'Creating account...' : 'Sign Up'}
+        </button>
+        <p style={{textAlign:'center', fontSize:'14px', color:'#666'}}>
+          Already have an account? <span style={{color:'#1e3a5f', cursor:'pointer', fontWeight:'bold'}} onClick={() => setPage('login')}>Login</span>
+        </p>
       </div>
     </div>
   )
@@ -130,6 +225,7 @@ function Dashboard({ token, user, showToast, setPage }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedTask, setSelectedTask] = useState(null)
+  const [teamFilter, setTeamFilter] = useState('all')
  
   useEffect(() => {
     fetch(`${API_URL}/api/tasks`, { headers: { Authorization: `Bearer ${token}` } })
@@ -139,6 +235,9 @@ function Dashboard({ token, user, showToast, setPage }) {
   }, [token])
  
   const statuses = ['To Do', 'In Progress', 'In Review', 'Done']
+
+  const teams = [...new Set(tasks.map(t => t.teamId).filter(Boolean))]
+  const filteredTasks = teamFilter === 'all' ? tasks : tasks.filter(t => t.teamId === teamFilter)
  
   const updateStatus = async (taskId, newStatus) => {
     await fetch(`${API_URL}/api/tasks/${taskId}`, {
@@ -149,20 +248,48 @@ function Dashboard({ token, user, showToast, setPage }) {
     setTasks(tasks.map(t => t.taskId === taskId ? { ...t, status: newStatus } : t))
     showToast('Task updated!')
   }
+
+  const deleteTask = async (taskId, e) => {
+    e.stopPropagation()
+    if (!window.confirm('Delete this task?')) return
+    await fetch(`${API_URL}/api/tasks/${taskId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    setTasks(tasks.filter(t => t.taskId !== taskId))
+    showToast('Task deleted!')
+  }
  
   if (loading) return <p style={{padding:'2rem'}}>Loading tasks...</p>
  
   return (
     <div>
-      <h2 style={{padding:'1rem 0'}}>Kanban Board</h2>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'1rem 0'}}>
+        <h2>Kanban Board</h2>
+        {user.role === 'manager' && (
+          <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+            <label style={{fontSize:'14px'}}>Filter by team:</label>
+            <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)} style={{padding:'6px', borderRadius:'6px', border:'1px solid #ddd'}}>
+              <option value="all">All Teams</option>
+              {teams.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
       <div className="kanban">
         {statuses.map(status => (
           <div key={status} className="kanban-col">
-            <h3>{status} ({tasks.filter(t => t.status === status).length})</h3>
-            {tasks.filter(t => t.status === status).map(task => (
+            <h3>{status} ({filteredTasks.filter(t => t.status === status).length})</h3>
+            {filteredTasks.filter(t => t.status === status).map(task => (
               <div key={task.taskId} className="task-card" onClick={() => setSelectedTask(task)}>
-                <p style={{fontWeight:'bold', marginBottom:'4px'}}>{task.title}</p>
-                <p style={{fontSize:'12px', color:'#666', marginBottom:'6px'}}>{task.assignee}</p>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                  <p style={{fontWeight:'bold', marginBottom:'4px'}}>{task.title}</p>
+                  {user.role === 'manager' && (
+                    <button className="btn btn-danger" style={{padding:'2px 6px', fontSize:'11px'}} onClick={e => deleteTask(task.taskId, e)}>✕</button>
+                  )}
+                </div>
+                <p style={{fontSize:'12px', color:'#666', marginBottom:'4px'}}>{task.assignee}</p>
+                <p style={{fontSize:'11px', color:'#999', marginBottom:'6px'}}>Team: {task.teamId}</p>
                 <span className={`badge badge-${task.priority?.toLowerCase()}`}>{task.priority}</span>
                 {task.imageUrl && <img src={task.imageUrl} alt="task" style={{width:'100%', marginTop:'8px', borderRadius:'4px', maxHeight:'120px', objectFit:'cover'}} />}
                 {user.role !== 'manager' && (
@@ -174,6 +301,9 @@ function Dashboard({ token, user, showToast, setPage }) {
                 )}
               </div>
             ))}
+            {filteredTasks.filter(t => t.status === status).length === 0 && (
+              <p style={{color:'#ccc', fontSize:'13px', textAlign:'center', padding:'1rem'}}>No tasks</p>
+            )}
           </div>
         ))}
       </div>
@@ -220,12 +350,22 @@ function TaskModal({ task, token, onClose, updateStatus, user, showToast }) {
         {task.imageUrl && <img src={task.imageUrl} alt="task" style={{width:'100%', marginBottom:'1rem', borderRadius:'6px', maxHeight:'200px', objectFit:'cover'}} />}
         {user.role === 'manager' && (
           <div style={{marginBottom:'1rem'}}>
+            <label style={{fontSize:'14px', marginRight:'8px'}}>Update Status:</label>
+            <select onChange={e => updateStatus(task.taskId, e.target.value)} defaultValue={task.status}>
+              {['To Do','In Progress','In Review','Done'].map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        )}
+        {user.role === 'employee' && (
+          <div style={{marginBottom:'1rem'}}>
+            <label style={{fontSize:'14px', marginRight:'8px'}}>Update Status:</label>
             <select onChange={e => updateStatus(task.taskId, e.target.value)} defaultValue={task.status}>
               {['To Do','In Progress','In Review','Done'].map(s => <option key={s}>{s}</option>)}
             </select>
           </div>
         )}
         <h3 style={{marginBottom:'8px'}}>Comments</h3>
+        {comments.length === 0 && <p style={{color:'#999', fontSize:'13px'}}>No comments yet.</p>}
         {comments.map(c => (
           <div key={c.commentId} className="card" style={{padding:'8px', marginBottom:'8px'}}>
             <p style={{fontSize:'13px'}}>{c.text}</p>
@@ -324,6 +464,16 @@ function Projects({ token, user, showToast }) {
     setShowForm(false)
     showToast('Project created!')
   }
+
+  const deleteProject = async (projectId) => {
+    if (!window.confirm('Delete this project?')) return
+    await fetch(`${API_URL}/api/projects/${projectId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    setProjects(projects.filter(p => p.projectId !== projectId))
+    showToast('Project deleted!')
+  }
  
   return (
     <div style={{padding:'1rem 0'}}>
@@ -335,13 +485,21 @@ function Projects({ token, user, showToast }) {
         <div className="card" style={{marginBottom:'1rem'}}>
           <div className="form-group"><label>Name</label><input value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
           <div className="form-group"><label>Description</label><textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} /></div>
-          <button className="btn btn-primary" onClick={create}>Create</button>
+          <div style={{display:'flex', gap:'8px'}}>
+            <button className="btn btn-primary" onClick={create}>Create</button>
+            <button className="btn" onClick={() => setShowForm(false)}>Cancel</button>
+          </div>
         </div>
       )}
       <div className="grid">
         {projects.map(p => (
           <div key={p.projectId} className="card">
-            <h3>{p.name}</h3>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+              <h3>{p.name}</h3>
+              {user.role === 'manager' && (
+                <button className="btn btn-danger" style={{padding:'2px 8px', fontSize:'12px'}} onClick={() => deleteProject(p.projectId)}>Delete</button>
+              )}
+            </div>
             <p style={{color:'#666', fontSize:'14px'}}>{p.description}</p>
           </div>
         ))}
