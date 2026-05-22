@@ -1,0 +1,31 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; background: #f0f2f5; }
+.navbar { background: #1e3a5f; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+.navbar h1 { font-size: 1.2rem; }
+.btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+.btn-primary { background: #1e3a5f; color: white; }
+.btn-danger { background: #e74c3c; color: white; }
+.btn-success { background: #27ae60; color: white; }
+.card { background: white; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; margin-bottom: 4px; font-weight: bold; font-size: 14px; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+.error { color: red; font-size: 14px; margin-top: 8px; }
+.kanban { display: flex; gap: 1rem; overflow-x: auto; padding: 1rem; }
+.kanban-col { background: #f8f9fa; border-radius: 8px; padding: 1rem; min-width: 250px; flex: 1; }
+.kanban-col h3 { margin-bottom: 1rem; font-size: 14px; color: #666; text-transform: uppercase; }
+.task-card { background: white; border-radius: 6px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; }
+.task-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+.badge-high { background: #fde8e8; color: #e74c3c; }
+.badge-medium { background: #fef3cd; color: #f39c12; }
+.badge-low { background: #d4edda; color: #27ae60; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal { background: white; border-radius: 8px; padding: 2rem; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
+.container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+input[type="text"], input[type="email"], input[type="password"] { outline: none; }
+.toast { position: fixed; bottom: 20px; right: 20px; background: #333; color: white; padding: 12px 20px; border-radius: 6px; z-index: 9999; }
+.toast.success { background: #27ae60; }
+.toast.error { background: #e74c3c; }
+
