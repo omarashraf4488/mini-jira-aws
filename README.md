@@ -24,6 +24,15 @@ http://mini-jira-alb-749364034.us-east-1.elb.amazonaws.com
 
 ## AWS Services Used
 VPC, EC2, ALB, Auto Scaling, CloudFront, DynamoDB, S3, Lambda, SNS, SQS, EventBridge, Cognito, CloudWatch, IAM
+## AWS Infrastructure Details
+- **CloudWatch Dashboard:** mini-jira-dashboard (4 widgets: CPU, DynamoDB writes, ALB requests, DynamoDB reads)
+- **CloudWatch Alarm:** mini-jira-high-cpu (triggers when CPU > 80%)
+- **EventBridge Rule:** Daily digest at 9 AM cron(0 9 * * ? *)
+- **SQS Queue:** mini-jira-task-queue
+- **SNS Topic:** mini-jira-task-assigned (email + SQS fan-out)
+- **DynamoDB Tables:** Tasks, Projects, Comments, Teams, Users, ActivityLog
+- **GSIs:** teamId-index and assigneeId-index on Tasks table
+- **S3 Buckets:** mini-jira-images-originals, mini-jira-images-resized
 
 ## Team
 - Omar Ashraf
