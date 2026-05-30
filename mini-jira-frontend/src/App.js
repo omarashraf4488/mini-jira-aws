@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { CognitoUserPool, CognitoUser, AuthenticationDetails, CognitoUserAttribute } from 'amazon-cognito-identity-js'
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { cognitoConfig, API_URL } from './aws-config'
 import './App.css'
  
@@ -235,7 +236,6 @@ function Dashboard({ token, user, showToast, setPage }) {
   }, [token])
  
   const statuses = ['To Do', 'In Progress', 'In Review', 'Done']
-
   const teams = [...new Set(tasks.map(t => t.teamId).filter(Boolean))]
   const filteredTasks = teamFilter === 'all' ? tasks : tasks.filter(t => t.teamId === teamFilter)
  
@@ -259,6 +259,14 @@ function Dashboard({ token, user, showToast, setPage }) {
     setTasks(tasks.filter(t => t.taskId !== taskId))
     showToast('Task deleted!')
   }
+
+  const onDragEnd = (result) => {
+    const { destination, source, draggableId } = result
+    if (!destination) return
+    if (destination.droppableId === source.droppableId) return
+    const newStatus = destination.droppableId
+    updateStatus(draggableId, newStatus)
+  }
  
   if (loading) return <p style={{padding:'2rem'}}>Loading tasks...</p>
  
@@ -276,37 +284,68 @@ function Dashboard({ token, user, showToast, setPage }) {
           </div>
         )}
       </div>
-      <div className="kanban">
-        {statuses.map(status => (
-          <div key={status} className="kanban-col">
-            <h3>{status} ({filteredTasks.filter(t => t.status === status).length})</h3>
-            {filteredTasks.filter(t => t.status === status).map(task => (
-              <div key={task.taskId} className="task-card" onClick={() => setSelectedTask(task)}>
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-                  <p style={{fontWeight:'bold', marginBottom:'4px'}}>{task.title}</p>
-                  {user.role === 'manager' && (
-                    <button className="btn btn-danger" style={{padding:'2px 6px', fontSize:'11px'}} onClick={e => deleteTask(task.taskId, e)}>✕</button>
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="kanban">
+          {statuses.map(status => (
+            <Droppable droppableId={status} key={status}>
+              {(provided, snapshot) => (
+                <div
+                  className="kanban-col"
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  style={{
+                    background: snapshot.isDraggingOver ? '#e8f4fd' : undefined,
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <h3>{status} ({filteredTasks.filter(t => t.status === status).length})</h3>
+                  {filteredTasks.filter(t => t.status === status).map((task, index) => (
+                    <Draggable draggableId={task.taskId} index={index} key={task.taskId}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          className="task-card"
+                          onClick={() => setSelectedTask(task)}
+                          style={{
+                            ...provided.draggableProps.style,
+                            boxShadow: snapshot.isDragging ? '0 4px 12px rgba(0,0,0,0.2)' : undefined,
+                            opacity: snapshot.isDragging ? 0.9 : 1
+                          }}
+                        >
+                          <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                            <p style={{fontWeight:'bold', marginBottom:'4px'}}>{task.title}</p>
+                            {user.role === 'manager' && (
+                              <button className="btn btn-danger" style={{padding:'2px 6px', fontSize:'11px'}} onClick={e => deleteTask(task.taskId, e)}>✕</button>
+                            )}
+                          </div>
+                          <p style={{fontSize:'12px', color:'#666', marginBottom:'4px'}}>{task.assignee}</p>
+                          <p style={{fontSize:'11px', color:'#999', marginBottom:'6px'}}>Team: {task.teamId}</p>
+                          <span className={`badge badge-${task.priority?.toLowerCase()}`}>{task.priority}</span>
+                          {task.deadline && <p style={{fontSize:'11px', color:'#999', marginTop:'4px'}}>📅 {task.deadline}</p>}
+                          {task.imageUrl && <img src={task.imageUrl} alt="task" style={{width:'100%', marginTop:'8px', borderRadius:'4px', maxHeight:'120px', objectFit:'cover'}} />}
+                          {user.role !== 'manager' && (
+                            <div style={{marginTop:'8px'}} onClick={e => e.stopPropagation()}>
+                              <select style={{fontSize:'12px', padding:'2px', width:'100%'}} value={task.status} onChange={e => updateStatus(task.taskId, e.target.value)}>
+                                {statuses.map(s => <option key={s}>{s}</option>)}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                  {filteredTasks.filter(t => t.status === status).length === 0 && (
+                    <p style={{color:'#ccc', fontSize:'13px', textAlign:'center', padding:'1rem'}}>Drop tasks here</p>
                   )}
                 </div>
-                <p style={{fontSize:'12px', color:'#666', marginBottom:'4px'}}>{task.assignee}</p>
-                <p style={{fontSize:'11px', color:'#999', marginBottom:'6px'}}>Team: {task.teamId}</p>
-                <span className={`badge badge-${task.priority?.toLowerCase()}`}>{task.priority}</span>
-                {task.imageUrl && <img src={task.imageUrl} alt="task" style={{width:'100%', marginTop:'8px', borderRadius:'4px', maxHeight:'120px', objectFit:'cover'}} />}
-                {user.role !== 'manager' && (
-                  <div style={{marginTop:'8px'}}>
-                    <select style={{fontSize:'12px', padding:'2px'}} value={task.status} onChange={e => { e.stopPropagation(); updateStatus(task.taskId, e.target.value) }} onClick={e => e.stopPropagation()}>
-                      {statuses.map(s => <option key={s}>{s}</option>)}
-                    </select>
-                  </div>
-                )}
-              </div>
-            ))}
-            {filteredTasks.filter(t => t.status === status).length === 0 && (
-              <p style={{color:'#ccc', fontSize:'13px', textAlign:'center', padding:'1rem'}}>No tasks</p>
-            )}
-          </div>
-        ))}
-      </div>
+              )}
+            </Droppable>
+          ))}
+        </div>
+      </DragDropContext>
       {selectedTask && <TaskModal task={selectedTask} token={token} user={user} onClose={() => setSelectedTask(null)} updateStatus={updateStatus} showToast={showToast} />}
     </div>
   )
@@ -348,22 +387,12 @@ function TaskModal({ task, token, onClose, updateStatus, user, showToast }) {
         <p style={{fontSize:'14px', color:'#666', marginBottom:'4px'}}>Deadline: {task.deadline}</p>
         <p style={{fontSize:'14px', color:'#666', marginBottom:'1rem'}}>Status: {task.status}</p>
         {task.imageUrl && <img src={task.imageUrl} alt="task" style={{width:'100%', marginBottom:'1rem', borderRadius:'6px', maxHeight:'200px', objectFit:'cover'}} />}
-        {user.role === 'manager' && (
-          <div style={{marginBottom:'1rem'}}>
-            <label style={{fontSize:'14px', marginRight:'8px'}}>Update Status:</label>
-            <select onChange={e => updateStatus(task.taskId, e.target.value)} defaultValue={task.status}>
-              {['To Do','In Progress','In Review','Done'].map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-        )}
-        {user.role === 'employee' && (
-          <div style={{marginBottom:'1rem'}}>
-            <label style={{fontSize:'14px', marginRight:'8px'}}>Update Status:</label>
-            <select onChange={e => updateStatus(task.taskId, e.target.value)} defaultValue={task.status}>
-              {['To Do','In Progress','In Review','Done'].map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-        )}
+        <div style={{marginBottom:'1rem'}}>
+          <label style={{fontSize:'14px', marginRight:'8px'}}>Update Status:</label>
+          <select onChange={e => updateStatus(task.taskId, e.target.value)} defaultValue={task.status}>
+            {['To Do','In Progress','In Review','Done'].map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
         <h3 style={{marginBottom:'8px'}}>Comments</h3>
         {comments.length === 0 && <p style={{color:'#999', fontSize:'13px'}}>No comments yet.</p>}
         {comments.map(c => (
