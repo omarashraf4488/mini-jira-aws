@@ -7,8 +7,10 @@ const { verifyToken } = require('./auth')
 
 const dynamo = new AWS.DynamoDB.DocumentClient({ region: process.env.AWS_REGION })
 const sns = new AWS.SNS({ region: process.env.AWS_REGION })
+const s3 = new AWS.S3({ region: process.env.AWS_REGION })
 const TABLE = 'Tasks'
 const SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:717094201142:mini-jira-task-assigned'
+const S3_BUCKET = 'mini-jira-images-originals'
 
 // Get all tasks
 router.get('/', verifyToken, async (req, res) => {
@@ -84,18 +86,27 @@ router.post('/', verifyToken, async (req, res) => {
   }
 })
 
-// Update task (employees can only update status)
+// Update task
 router.put('/:taskId', verifyToken, async (req, res) => {
   try {
-    const { role, teamId, userId } = req.user
+    const { role, teamId, userId, email } = req.user
     const existing = await dynamo.get({
       TableName: TABLE,
       Key: { taskId: req.params.taskId }
     }).promise()
 
     if (!existing.Item) return res.status(404).json({ error: 'Task not found' })
+    
+    // Team isolation check
     if (role !== 'manager' && existing.Item.teamId !== teamId) {
       return res.status(403).json({ error: 'Access denied' })
+    }
+
+    // Employees can only update status of tasks assigned to them
+    if (role === 'employee') {
+      if (existing.Item.assignee !== email) {
+        return res.status(403).json({ error: 'You can only update tasks assigned to you' })
+      }
     }
 
     // Employees can only update status, managers can update everything
@@ -122,10 +133,28 @@ router.put('/:taskId', verifyToken, async (req, res) => {
   }
 })
 
-// Delete task (manager only)
+// Delete task (manager only) - also deletes image from S3
 router.delete('/:taskId', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'manager') return res.status(403).json({ error: 'Only managers can delete tasks' })
+
+    // Get task first to find image
+    const existing = await dynamo.get({
+      TableName: TABLE,
+      Key: { taskId: req.params.taskId }
+    }).promise()
+
+    // Delete image from S3 if exists
+    if (existing.Item && existing.Item.imageKey) {
+      try {
+        await s3.deleteObject({
+          Bucket: S3_BUCKET,
+          Key: existing.Item.imageKey
+        }).promise()
+      } catch (s3Err) {
+        console.error('S3 delete error:', s3Err.message)
+      }
+    }
 
     await dynamo.delete({
       TableName: TABLE,
