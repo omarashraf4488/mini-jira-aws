@@ -21,6 +21,7 @@ http://mini-jira-alb-749364034.us-east-1.elb.amazonaws.com
 ## Demo Users
 - **Manager**: omar@test.com / Test1234!
 - **Frontend Employee**: sara@test.com / Test1234!
+- **Backend Employee**: saif@test.com  / Test1234!
 
 ## AWS Services Used
 VPC, EC2, ALB, Auto Scaling, CloudFront, DynamoDB, S3, Lambda, SNS, SQS, EventBridge, Cognito, CloudWatch, IAM
