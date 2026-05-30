@@ -33,6 +33,25 @@ VPC, EC2, ALB, Auto Scaling, CloudFront, DynamoDB, S3, Lambda, SNS, SQS, EventBr
 - **DynamoDB Tables:** Tasks, Projects, Comments, Teams, Users, ActivityLog
 - **GSIs:** teamId-index and assigneeId-index on Tasks table
 - **S3 Buckets:** mini-jira-images-originals, mini-jira-images-resized
+## DynamoDB Schema
 
+### Tables and Keys
+
+| Table | Partition Key | Sort Key | GSIs |
+|-------|--------------|----------|------|
+| Tasks | taskId (String) | - | teamId-index, assigneeId-index |
+| Projects | projectId (String) | - | - |
+| Comments | commentId (String) | - | taskId-index |
+| Teams | teamId (String) | - | - |
+| Users | userId (String) | - | - |
+| ActivityLog | logId (String) | - | - |
+
+### Task Item Structure
+- taskId, title, description, status, priority, deadline
+- assignee (email), teamId, imageUrl, imageKey
+- createdAt, auditLog (array of status changes)
+
+### Status Flow
+To Do → In Progress → In Review → Done
 ## Team
 - Omar Ashraf
