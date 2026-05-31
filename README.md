@@ -5,6 +5,9 @@ A lightweight team task-management web application built on AWS.
 ## Live URL
 http://mini-jira-alb-749364034.us-east-1.elb.amazonaws.com
 
+## Demo Video
+https://youtu.be/leCIYUalATE
+
 ## Architecture
 - **Frontend**: React.js served via Express on EC2
 - **Backend**: Node.js/Express REST API on EC2 (Auto Scaling Group across 2 AZs)
